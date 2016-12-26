@@ -3,7 +3,7 @@
 #include "colors_csgo.inc"
 
 //Defines
-#define VERSION "1.00"
+#define VERSION "1.01"
 #define CHAT_TAG_PREFIX "[{orange}PlayTime{default}] "
 
 #define ANTI_FLOOD_TIME 1.0
@@ -30,8 +30,11 @@ public Plugin myinfo =
 // Plugin Start
 public void OnPluginStart()
 {
+  //Common translations
+  LoadTranslations("common.phrases");
+  
   //Flags
-  CreateConVar("sm_playtime_version", VERSION, "", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_CHEAT|FCVAR_DONTRECORD);
+  CreateConVar("sm_playtime_version", VERSION, "", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_CHEAT|FCVAR_DONTRECORD);
   
   //Convars
   cvar_playtime_serverID = CreateConVar("sm_playtime_serverid", "0", "Servers ID in database");
@@ -39,6 +42,9 @@ public void OnPluginStart()
   //Commands
   RegConsoleCmd("sm_playtime", Command_CheckPlayTime);
   RegConsoleCmd("sm_pt", Command_CheckPlayTime);
+  
+  RegAdminCmd("sm_checkplaytime", Command_AdminCheckPlayTime, ADMFLAG_GENERIC);
+  RegAdminCmd("sm_checkpt", Command_AdminCheckPlayTime, ADMFLAG_GENERIC);
   
   //Hook serverID
   HookConVarChange(cvar_playtime_serverID, ConVarChange);
@@ -166,24 +172,33 @@ public Action CheckTime(Handle timer)
   return Plugin_Continue;
 }
 
-public Action Command_CheckPlayTime(int client, int args)
+public Action Command_AdminCheckPlayTime(int client, int args)
 {
-  if(IsFakeClient(client))
-    return Plugin_Handled;
-    
-  if (!IsClientInGame(client))
-    return Plugin_Handled;
-
-  if (!g_canCheckPlayTime[client]) {
-    //Using plugin too quickly
-    CPrintToChat(client, "%s%s", CHAT_TAG_PREFIX, "You are using this command too quickly.");
-    LogAction(client, -1, "\"%L\" is using !playtime too quickly. Possible flood attempt.", client);
+  //Get arguments
+  if (args != 1 && args != 2) {
+    CPrintToChat(client, "%sUsage: sm_checkplaytime <player> or sm_checkplaytime <CT|T> <player>.", CHAT_TAG_PREFIX);
     return Plugin_Handled;
   }
-
-  g_canCheckPlayTime[client] = false;
-  CreateTimer(ANTI_FLOOD_TIME, Timer_ReEnable_Usage, client);
   
+  char team[3];
+  char targetstring[64];
+  
+  GetCmdArg(1, targetstring, sizeof(targetstring));
+  GetCmdArg(2, team, sizeof(team));
+  
+  int target = FindTarget(client, targetstring, true, false);
+  
+  if (target == -1)
+    return Plugin_Handled;
+  
+  trigger_playtime(target, client, team);
+  
+  return Plugin_Handled;
+}
+
+
+public Action Command_CheckPlayTime(int client, int args)
+{
   if (args != 0 && args != 1) {
     CPrintToChat(client, "%sUsage: sm_playtime or sm_playtime <CT|T>.", CHAT_TAG_PREFIX);
     return Plugin_Handled;
@@ -192,16 +207,43 @@ public Action Command_CheckPlayTime(int client, int args)
   char team[3];
   GetCmdArg(1, team, sizeof(team));
   
-  if (args == 1 && !StrEqual(team, "CT", false) && !StrEqual(team, "T", false)) {
-    CPrintToChat(client, "%sTeam must be either {lightblue}CT{default} or {olive}T{default}.", CHAT_TAG_PREFIX);
-    return Plugin_Handled;
+  trigger_playtime(client, client, team);
+  
+  return Plugin_Handled;
+}
+
+/**
+* Perform Playtime check
+* caller param player who triggered check
+*/
+public void trigger_playtime(int target, int caller, char team[3])
+{
+  if(IsFakeClient(target))
+    return;
+    
+  if (!IsClientInGame(target))
+    return;
+
+  if (!g_canCheckPlayTime[caller]) {
+    //Using plugin too quickly
+    CPrintToChat(caller, "%s%s", CHAT_TAG_PREFIX, "You are using this command too quickly.");
+    LogAction(caller, -1, "\"%L\" is using !playtime too quickly. Possible flood attempt.", caller);
+    return;
+  }
+
+  g_canCheckPlayTime[caller] = false;
+  CreateTimer(ANTI_FLOOD_TIME, Timer_ReEnable_Usage, caller);
+  
+  if (strlen(team) != 0 && !StrEqual(team, "CT", false) && !StrEqual(team, "T", false)) {
+    CPrintToChat(caller, "%sTeam must be either {lightblue}CT{default} or {olive}T{default}.", CHAT_TAG_PREFIX);
+    return;
   }
   
   //Look up players CT time and T time
   char SteamID[32];
-  if (!GetClientAuthId(client, AuthId_Steam2, SteamID, sizeof(SteamID))) {
-    LogError("Could not get client auth ID at Command_CheckPlayTime");
-    return Plugin_Handled;
+  if (!GetClientAuthId(target, AuthId_Steam2, SteamID, sizeof(SteamID))) {
+    LogError("Could not get client auth ID at trigger_playtime");
+    return;
   }
   
   //Query database
@@ -213,10 +255,10 @@ public Action Command_CheckPlayTime(int client, int args)
   } else {
     //Make datapack for query
     Handle datapack = CreateDataPack();
-    WritePackCell(datapack, client);
-    if (args == 0)
+    WritePackCell(datapack, target);
+    if (strlen(team) == 0)
       WritePackCell(datapack, 0);
-    else if (args == 1) {
+    else if (strlen(team) != 0) {
       if (StrEqual(team, "CT", false))
         WritePackCell(datapack, CS_TEAM_CT);
       else if (StrEqual(team, "T", false))
@@ -226,12 +268,10 @@ public Action Command_CheckPlayTime(int client, int args)
     //Connection successful
     char query[255];
     Format(query, sizeof(query), "SELECT playtime_ct, playtime_t FROM pt_times WHERE authid = '%s' AND ServerID = %d", SteamID, ServerID);
-    SQL_TQuery(db, DB_Callback_Command_CheckPlayTime, query, datapack);
+    SQL_TQuery(db, DB_Callback_CheckPlayTime, query, datapack);
 
     CloseHandle(db);
   }
-  
-  return Plugin_Handled;
 }
 
 //Re-enable playtime checking usage for particular client
@@ -240,13 +280,13 @@ public Action Timer_ReEnable_Usage(Handle timer, int client)
   g_canCheckPlayTime[client] = true;
 }
 
-public void DB_Callback_Command_CheckPlayTime(Handle owner, Handle hndl, const char[] error, any datapack)
+public void DB_Callback_CheckPlayTime(Handle owner, Handle hndl, const char[] error, any datapack)
 {
-	if (hndl == INVALID_HANDLE) {
+  if (hndl == INVALID_HANDLE) {
     LogError("Error selecting play time at Command_CheckPlayTime: %s", error);
     CloseHandle(datapack);
   }
-	else {
+  else {
     ResetPack(datapack);
     int client = ReadPackCell(datapack);
     int mode = ReadPackCell(datapack);
@@ -267,6 +307,6 @@ public void DB_Callback_Command_CheckPlayTime(Handle owner, Handle hndl, const c
       else if (mode == CS_TEAM_T) {
         CPrintToChatAll("%s{lightgreen}%N's{default} play time on {olive}T{default} is {lightgreen}%d{default} minutes.", CHAT_TAG_PREFIX, client, db_playtime_t + playtime_t[client]);
       }
-		}
-	}
+    }
+  }
 }
