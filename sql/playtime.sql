@@ -13,6 +13,7 @@ CREATE TABLE pt_servers
 CREATE TABLE pt_times
 (
   authid varchar(32) NOT NULL,
+  name varchar(64) NOT NULL,
   ServerID int NOT NULL,
   playtime_ct int DEFAULT 0,
   playtime_t int DEFAULT 0,
