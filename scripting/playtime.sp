@@ -1,17 +1,26 @@
 #include <sourcemod>
 #include <cstrike>
-#include "colors_csgo.inc"
+#include <colors_csgo_v2>
 
-//Defines
-#define VERSION "1.02"
+// Plugin Informaiton
+#define VERSION "1.03"
+
+public Plugin myinfo =
+{
+  name = "Playtime",
+  author = "Invex | Byte",
+  description = "Counts and stores player playtime.",
+  version = VERSION,
+  url = "http://www.invexgaming.com.au"
+};
+
+//Definitions
 #define CHAT_TAG_PREFIX "[{orange}PlayTime{default}] "
-
 #define ANTI_FLOOD_TIME 1.0
 #define TOP100_UPDATE_TIME 900
 #define MAX_MENU_OPTIONS 6
 
 //Global Varibales
-int g_ServerId = 0;
 int g_PlayTimeCt[MAXPLAYERS+1] = {0, ...}; //playtime in current session in minutes on CT side
 int g_PlayTimeT[MAXPLAYERS+1] = {0, ...}; //playtime in current session in minutes on T side
 
@@ -24,14 +33,17 @@ int g_Top100LastUpdated = -1;
 //Convars
 ConVar g_Cvar_PlayTimeServerId = null;
 
-public Plugin myinfo =
+//Lateload
+bool g_LateLoaded = false;
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
-  name = "Playtime",
-  author = "Invex | Byte",
-  description = "Counts and stores player playtime.",
-  version = VERSION,
-  url = "http://www.invexgaming.com.au"
-};
+  CreateNative("GetClientPlayTime", Native_GetClientPlayTime);
+  CreateNative("GetClientPlayTimeAll", Native_GetClientPlayTimeAll);
+
+  g_LateLoaded = late;
+  return APLRes_Success;
+}
 
 // Plugin Start
 public void OnPluginStart()
@@ -61,9 +73,6 @@ public void OnPluginStart()
   RegAdminCmd("sm_playtimecheckall", Command_AdminCheckPlayTimeAll, ADMFLAG_GENERIC);
   RegAdminCmd("sm_ptcheckall", Command_AdminCheckPlayTimeAll, ADMFLAG_GENERIC);
   
-  //Hook serverID
-  HookConVarChange(g_Cvar_PlayTimeServerId, ConVarChange);
-  
   //Enable checking
   for (int i = 1; i <= MaxClients; ++i) {
     if(IsClientInGame(i)) {
@@ -74,8 +83,13 @@ public void OnPluginStart()
   //Create config file
   AutoExecConfig(true, "playtime");
   
-  //Set server ID
-  g_ServerId = g_Cvar_PlayTimeServerId.IntValue;
+  //Late load
+  if (g_LateLoaded) {
+    for (int i = 1; i <= MaxClients; ++i) {
+      if (IsClientInGame(i))
+        OnClientPutInServer(i);
+    }
+  }
   
   //Timer
   CreateTimer(60.0, CheckTime, _, TIMER_REPEAT);
@@ -90,12 +104,6 @@ public void OnPluginEnd()
     }
   }
 }
-
-public void ConVarChange(Handle convar, const char[] oldValue, const char[] newValue)
-{
-  g_ServerId = StringToInt(newValue) ;
-}
-
 
 public void OnClientPutInServer(int client)
 {
@@ -129,7 +137,7 @@ public void OnClientAuthorized(int client, const char[] steamId)
     SQL_EscapeString(db, clientName, clientName, sizeof(clientName));
     
     char query[1024];
-    Format(query, sizeof(query), "INSERT IGNORE INTO pt_times(authid, name, ServerID) VALUES ('%s', '%s', %d)", steamId, clientName, g_ServerId);
+    Format(query, sizeof(query), "INSERT IGNORE INTO pt_times(authid, name, ServerID) VALUES ('%s', '%s', %d)", steamId, clientName, g_Cvar_PlayTimeServerId.IntValue);
     SQL_TQuery(db, DB_Callback_OnClientAuthorized, query, _);
 
     delete db;
@@ -170,7 +178,7 @@ public void OnClientDisconnect(int client)
     SQL_EscapeString(db, clientName, clientName, sizeof(clientName));
     
     char query[1024];
-    Format(query, sizeof(query), "UPDATE pt_times SET playtime_ct=playtime_ct+%d, playtime_t=playtime_t+%d, name='%s' WHERE authid = '%s' AND ServerID = %d", g_PlayTimeCt[client], g_PlayTimeT[client], clientName, steamId, g_ServerId);
+    Format(query, sizeof(query), "UPDATE pt_times SET playtime_ct=playtime_ct+%d, playtime_t=playtime_t+%d, name='%s' WHERE authid = '%s' AND ServerID = %d", g_PlayTimeCt[client], g_PlayTimeT[client], clientName, steamId, g_Cvar_PlayTimeServerId.IntValue);
     SQL_TQuery(db, DB_Callback_OnClientDisconnect, query, _);
 
     delete db;
@@ -203,7 +211,9 @@ public Action Command_AdminCheckPlayTime(int client, int args)
 {
   //Get arguments
   if (args != 1 && args != 2) {
-    CPrintToChat(client, "%sUsage: sm_playtimecheck <player> or sm_playtimecheck <player> <CT|T>.", CHAT_TAG_PREFIX);
+    char cmd[32];
+    GetCmdArg(0, cmd, sizeof(cmd));
+    CPrintToChat(client, "%sUsage: %s <player> or %s <player> <CT|T>.", CHAT_TAG_PREFIX, cmd, cmd);
     return Plugin_Handled;
   }
   
@@ -227,7 +237,9 @@ public Action Command_AdminCheckPlayTimeAll(int client, int args)
 {
   //Get arguments
   if (args != 1 && args != 2) {
-    CPrintToChat(client, "%sUsage: sm_playtimecheckall <player> or sm_playtimecheckall <player> <CT|T>.", CHAT_TAG_PREFIX);
+    char cmd[32];
+    GetCmdArg(0, cmd, sizeof(cmd));
+    CPrintToChat(client, "%sUsage: %s <player> or %s <player> <CT|T>.", CHAT_TAG_PREFIX, cmd, cmd);
     return Plugin_Handled;
   }
   
@@ -250,7 +262,9 @@ public Action Command_AdminCheckPlayTimeAll(int client, int args)
 public Action Command_CheckPlayTime(int client, int args)
 {
   if (args > 1) {
-    CPrintToChat(client, "%sUsage: sm_playtime or sm_playtime <CT|T>.", CHAT_TAG_PREFIX);
+    char cmd[32];
+    GetCmdArg(0, cmd, sizeof(cmd));
+    CPrintToChat(client, "%sUsage: %s or %s <CT|T>.", CHAT_TAG_PREFIX, cmd, cmd);
     return Plugin_Handled;
   }
   
@@ -265,7 +279,9 @@ public Action Command_CheckPlayTime(int client, int args)
 public Action Command_CheckPlayTimeAll(int client, int args)
 {
   if (args > 1) {
-    CPrintToChat(client, "%sUsage: sm_playtimeall or sm_playtimeall <CT|T>.", CHAT_TAG_PREFIX);
+    char cmd[32];
+    GetCmdArg(0, cmd, sizeof(cmd));
+    CPrintToChat(client, "%sUsage: %s or %s <CT|T>.", CHAT_TAG_PREFIX, cmd, cmd);
     return Plugin_Handled;
   }
   
@@ -294,7 +310,7 @@ public Action Command_CheckPlayTimeTop(int client, int args)
       g_Top100LastUpdated = GetTime();
       
       char query[1024];
-      Format(query, sizeof(query), "SELECT name, playtime_ct + playtime_t as playtime FROM pt_times WHERE ServerID = %d ORDER BY playtime DESC LIMIT 100", g_ServerId);
+      Format(query, sizeof(query), "SELECT name, playtime_ct + playtime_t as playtime FROM pt_times WHERE ServerID = %d ORDER BY playtime DESC LIMIT 100", g_Cvar_PlayTimeServerId.IntValue);
       
       SQL_TQuery(db, DB_Callback_CheckPlayTimeTop, query, client);
 
@@ -327,7 +343,7 @@ public void TriggerPlaytime(int client, int target, char team[3], bool currentSe
   CreateTimer(ANTI_FLOOD_TIME, Timer_ReEnable_Usage, client);
   
   if (strlen(team) != 0 && !StrEqual(team, "CT", false) && !StrEqual(team, "T", false)) {
-    CPrintToChat(client, "%sTeam must be either {lightblue}CT{default} or {olive}T{default}.", CHAT_TAG_PREFIX);
+    CPrintToChat(client, "%sTeam must be either {lightblue}CT{default} or {yellow}T{default}.", CHAT_TAG_PREFIX);
     return;
   }
   
@@ -368,10 +384,10 @@ public void TriggerPlaytime(int client, int target, char team[3], bool currentSe
     
     //Check if we should restrict to current server
     if (currentServerOnly)
-      Format(query, sizeof(query), "%s AND ServerID = %d", query, g_ServerId);
+      Format(query, sizeof(query), "%s AND ServerID = %d", query, g_Cvar_PlayTimeServerId.IntValue);
     
     SQL_TQuery(db, DB_Callback_CheckPlayTime, query, pack);
-
+    
     delete db;
   }
 }
@@ -396,8 +412,8 @@ public void DB_Callback_CheckPlayTime(Handle owner, Handle hndl, const char[] er
     int iRowCount = SQL_GetRowCount(hndl);
     if (iRowCount) {
       SQL_FetchRow(hndl);
-      int db_PlayTimeCt = SQL_FetchInt(hndl, 0);
-      int db_PlayTimeT = SQL_FetchInt(hndl, 1)
+      int dbPlayTimeCt = SQL_FetchInt(hndl, 0);
+      int dbPlayTimeT = SQL_FetchInt(hndl, 1)
       
       char serverText[12];
       Format(serverText, sizeof(serverText), "this server");
@@ -406,13 +422,13 @@ public void DB_Callback_CheckPlayTime(Handle owner, Handle hndl, const char[] er
       
       //Print out users playtime
       if (team == 0) { //both teams
-        CPrintToChatAll("%s{lightgreen}%N's{default} total play time for {lightgreen}%s{default} is {lightgreen}%d{default} minutes.", CHAT_TAG_PREFIX, client, serverText, db_PlayTimeCt + db_PlayTimeT + g_PlayTimeCt[client] + g_PlayTimeT[client]);
+        CPrintToChatAll("%s{lime}%N's{default} total play time for {lime}%s{default} is {lime}%d{default} minutes.", CHAT_TAG_PREFIX, client, serverText, dbPlayTimeCt + dbPlayTimeT + g_PlayTimeCt[client] + g_PlayTimeT[client]);
       }
       else if (team == CS_TEAM_CT) {
-        CPrintToChatAll("%s{lightgreen}%N's{default} play time on {lightblue}CT{default} for {lightgreen}%s{default} is {lightgreen}%d{default} minutes.", CHAT_TAG_PREFIX, client, serverText, db_PlayTimeCt + g_PlayTimeCt[client]);
+        CPrintToChatAll("%s{lime}%N's{default} play time on {lightblue}CT{default} for {lime}%s{default} is {lime}%d{default} minutes.", CHAT_TAG_PREFIX, client, serverText, dbPlayTimeCt + g_PlayTimeCt[client]);
       }
       else if (team == CS_TEAM_T) {
-        CPrintToChatAll("%s{lightgreen}%N's{default} play time on {olive}T{default} for {lightgreen}%s{default} is {lightgreen}%d{default} minutes.", CHAT_TAG_PREFIX, client, serverText, db_PlayTimeT + g_PlayTimeT[client]);
+        CPrintToChatAll("%s{lime}%N's{default} play time on {yellow}T{default} for {lime}%s{default} is {lime}%d{default} minutes.", CHAT_TAG_PREFIX, client, serverText, dbPlayTimeT + g_PlayTimeT[client]);
       }
     }
   }
@@ -457,7 +473,7 @@ void ShowTop100Menu(int client)
   //Create a menu
   Menu top100Menu = new Menu(Top100MenuHandler, MenuAction_Select|MenuAction_Cancel|MenuAction_End|MenuAction_DisplayItem);
   
-  //need dummy items or else menu wont show correct pagination
+  //Need dummy items or else menu wont show correct pagination
   //Need 10 pages total
   for (int i = 0; i < MAX_MENU_OPTIONS * 10; ++i)
     top100Menu.AddItem("", "", ITEMDRAW_NOTEXT);
@@ -496,4 +512,101 @@ public int Top100MenuHandler(Menu menu, MenuAction action, int param1, int param
       delete menu;
     }
   }
+}
+
+//Natives
+
+public int Native_GetClientPlayTime(Handle plugin, int numParams)
+{
+  int client = GetNativeCell(1);
+  int team = GetNativeCell(2);
+  
+  return GetPlayTimeNonThreaded(client, team, true);
+}
+
+public int Native_GetClientPlayTimeAll(Handle plugin, int numParams)
+{
+  int client = GetNativeCell(1);
+  int team = GetNativeCell(2);
+  
+  return GetPlayTimeNonThreaded(client, team, false);
+}
+
+//Non threaded retrieval of playtime from database
+int GetPlayTimeNonThreaded(int client, int team, bool currentServerOnly)
+{
+  int returnValue;
+  
+  if (client <= 0 || client > MaxClients) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Client is not valid");
+    return -1;
+  }
+  
+  if (!IsClientInGame(client)) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Client is not in game");
+    return -1;
+  }
+  
+  if (IsFakeClient(client)) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Cannot get playtime of Fake Clients");
+    return -1;
+  }
+
+  if (!IsClientAuthorized(client)) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Client has not been authorized");
+    return -1;
+  }
+  
+  if (team != CS_TEAM_NONE && team != CS_TEAM_T && team != CS_TEAM_CT) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Invalid team provided");
+    return -1;
+  }
+  
+  //Get client Auth ID
+  char steamId[32];
+  if (!GetClientAuthId(client, AuthId_Steam2, steamId, sizeof(steamId))) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Failed to get client Auth ID");
+    return -1;
+  }
+  
+  //Query database
+  char error[255];
+  Handle db = SQL_Connect("playtime", true, error, sizeof(error));
+   
+  if (db == null) {
+    ThrowNativeError(SP_ERROR_NATIVE, "Failed to connect to database: %s", error);
+    return -1;
+  } else {
+    char query[1024];
+    Format(query, sizeof(query), "SELECT SUM(playtime_ct), SUM(playtime_t) FROM pt_times WHERE authid = '%s'", steamId);
+    
+    if (currentServerOnly)
+      Format(query, sizeof(query), "%s AND ServerID = %d", query, g_Cvar_PlayTimeServerId.IntValue);
+    
+    DBResultSet dbResults = SQL_Query(db, query);
+    
+    if (dbResults == null) {
+      ThrowNativeError(SP_ERROR_NATIVE, "Failed to fetch database results");
+      return -1;
+    }
+    
+    //Process results
+    if (dbResults.RowCount) {
+      dbResults.FetchRow();
+      int dbPlayTimeCt = dbResults.FetchInt(0);
+      int dbPlayTimeT = dbResults.FetchInt(1);
+      
+      if (team == CS_TEAM_NONE)
+        returnValue = dbPlayTimeCt + dbPlayTimeT + g_PlayTimeCt[client] + g_PlayTimeT[client];
+      else if (team == CS_TEAM_T)
+        returnValue = dbPlayTimeT + g_PlayTimeT[client];
+      else if (team == CS_TEAM_CT)
+        returnValue = dbPlayTimeCt + g_PlayTimeCt[client];
+    }
+    
+    delete dbResults;
+    delete db;
+  }
+  
+  return returnValue;
 }

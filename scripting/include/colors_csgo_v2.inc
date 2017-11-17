@@ -2,7 +2,7 @@
 *                                                                        *
 *                       Colored Chat Functions                           *
 *                   Author: exvel, Editor: Popoklopsi, Powerlord, Bara   *
-*                           Version: 1.1.3	                              *
+*                           Version: 2.0 (Edited by Byte)	               *
 *                                                                        *
 **************************************************************************/
 
@@ -23,25 +23,26 @@ enum Colors
 {
 	Color_Default = 0,
 	Color_Darkred,
-	Color_Pink,
 	Color_Green,
 	Color_Lightgreen,
-	Color_Lime,
-	Color_Red,
-	Color_Grey,
 	Color_Olive,
-	Color_A,
-	Color_Lightblue,
-	Color_Blue,
-	Color_D,
+	Color_Lime,
+	Color_Lightred,
 	Color_Purple,
-	Color_Darkrange,
-	Color_Orange
+	Color_Grey,
+	Color_Yellow,
+	Color_Orange,
+	Color_Bluegrey,
+	Color_LightBlue,
+	Color_Darkblue,
+	Color_Grey2,
+	Color_Orchid
 }
 
 /* Colors' properties */
-new String:CTag[][] = {"{default}", "{darkred}", "{pink}", "{green}", "{lightgreen}", "{lime}", "{red}", "{grey}", "{olive}", "{a}", "{lightblue}", "{blue}", "{d}", "{purple}", "{darkorange}", "{orange}"};
-new String:CTagCode[][] = {"\x01", "\x02", "\x03", "\x04", "\x05", "\x06", "\x07", "\x08", "\x09", "\x0A", "\x0B", "\x0C", "\x0D", "\x0E", "\x0F", "\x10"};
+new String:CTag[][] = {"{default}", "{darkred}", "{green}", "{lightgreen}", "{olive}", "{lime}", "{lightred}", "{purple}", "{grey}", "{yellow}", "{orange}", "{bluegrey}", "{lightblue}", "{darkblue}", "{grey2}", "{orchid}"};
+new String:CTagCode[][] = {"\x01", "\x02", "\x04", "\x03", "\x05", "\x06", "\x07", "\x03", "\x08", "\x09", "\x10", "\x0A", "\x0B", "\x0C", "\x0D", "\x0E"};
+
 new bool:CTagReqSayText2[] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
 new bool:CEventIsHooked = false;
 new bool:CSkipList[MAXPLAYERS+1] = {false,...};
@@ -82,7 +83,7 @@ stock CPrintToChat(client, const String:szMessage[], any:...)
 	if (index == NO_INDEX)
 		PrintToChat(client, "%s", szCMessage);
 	else
-	CSayText2(client, index, szCMessage);
+		CSayText2(client, index, szCMessage);
 }
 
 stock CReplyToCommand(client, const String:szMessage[], any:...)
@@ -106,7 +107,6 @@ stock CReplyToCommand(client, const String:szMessage[], any:...)
 		CPrintToChat(client, "%s", szCMessage);
 	}
 }
-
 
 /**
 * Prints a message to all clients in the chat area.
@@ -308,7 +308,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 	
 	// On CS:GO set invisible precolor
 	if (StrEqual(szGameName, "csgo", false)) 
-		Format(szMessage, maxlength, " \x01\x0B\x01%s", szMessage);
+		Format(szMessage, maxlength, "\x01\x0B\x01%s", szMessage);
 	
 	/* If author was specified replace {teamcolor} tag */
 	if (author != NO_INDEX)
@@ -321,7 +321,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 		}
 		/* If saytext2 is not supported by game replace {teamcolor} with green tag  */
 		else
-		ReplaceString(szMessage, maxlength, "{teamcolor}", CTagCode[Color_Green], false);
+		ReplaceString(szMessage, maxlength, "{teamcolor}", CTagCode[Color_Lightgreen], false);
 	}
 	else
 	ReplaceString(szMessage, maxlength, "{teamcolor}", "", false);
@@ -335,7 +335,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 		
 		/* If tag is not supported by game replace it with green tag */
 		else if (!CProfile_Colors[i])
-			ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green], false);
+			ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Lightgreen], false);
 		
 		/* If tag doesn't need saytext2 simply replace */
 		else if (!CTagReqSayText2[i])
@@ -346,7 +346,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 		{
 			/* If saytext2 is not supported by game replace tag with green tag */
 			if (!CProfile_SayText2)
-				ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green], false);
+				ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Lightgreen], false);
 			
 			/* Game supports saytext2 */
 			else 
@@ -359,7 +359,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 					
 					/* If player not found replace tag with green color tag */
 					if (iRandomPlayer == NO_PLAYER)
-						ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Green], false);
+						ReplaceString(szMessage, maxlength, CTag[i], CTagCode[Color_Lightgreen], false);
 					
 					/* If player was found simply replace */
 					else
@@ -445,107 +445,27 @@ stock CSetupProfile()
 	decl String:szGameName[30];
 	GetGameFolderName(szGameName, sizeof(szGameName));
 	
-	if (StrEqual(szGameName, "cstrike", false))
-	{
-		CProfile_Colors[Color_Lightgreen] = true;
-		CProfile_Colors[Color_Red] = true;
-		CProfile_Colors[Color_Blue] = true;
-		CProfile_Colors[Color_Olive] = true;
-		CProfile_TeamIndex[Color_Lightgreen] = SERVER_INDEX;
-		CProfile_TeamIndex[Color_Red] = 2;
-		CProfile_TeamIndex[Color_Blue] = 3;
-		CProfile_SayText2 = true;
-	}
-	else if (StrEqual(szGameName, "csgo", false))
+	if (StrEqual(szGameName, "csgo", false))
 	{
 		CProfile_Colors[Color_Default] = true;
 		CProfile_Colors[Color_Darkred] = true;
-		CProfile_Colors[Color_Pink] = true;
 		CProfile_Colors[Color_Green] = true;
 		CProfile_Colors[Color_Lightgreen] = true;
-		CProfile_Colors[Color_Lime] = true;
-		CProfile_Colors[Color_Red] = true;
-		CProfile_Colors[Color_Grey] = true;
 		CProfile_Colors[Color_Olive] = true;
-		CProfile_Colors[Color_A] = true;
-		CProfile_Colors[Color_Lightblue] = true;
-		CProfile_Colors[Color_Blue] = true;
-		CProfile_Colors[Color_D] = true;
-		CProfile_Colors[Color_Purple] = true;
-		CProfile_Colors[Color_Darkrange] = true;
-		CProfile_Colors[Color_Orange] = true;
-		CProfile_Colors[Color_Red] = true;
-		CProfile_Colors[Color_Blue] = true;
-		CProfile_Colors[Color_Olive] = true;
-		CProfile_Colors[Color_Darkred] = true;
 		CProfile_Colors[Color_Lime] = true;
+		CProfile_Colors[Color_Lightred] = true;
 		CProfile_Colors[Color_Purple] = true;
 		CProfile_Colors[Color_Grey] = true;
+		CProfile_Colors[Color_Yellow] = true;
 		CProfile_Colors[Color_Orange] = true;
-		CProfile_TeamIndex[Color_Red] = 2;
-		CProfile_TeamIndex[Color_Blue] = 3;
+		CProfile_Colors[Color_Bluegrey] = true;
+		CProfile_Colors[Color_LightBlue] = true;
+		CProfile_Colors[Color_Darkblue] = true;
+		CProfile_Colors[Color_Grey2] = true;
+		CProfile_Colors[Color_Orchid] = true;
+		CProfile_TeamIndex[Color_Yellow] = 2;
+		CProfile_TeamIndex[Color_Bluegrey] = 3;
 		CProfile_SayText2 = true;
-	}
-	else if (StrEqual(szGameName, "tf", false))
-	{
-		CProfile_Colors[Color_Lightgreen] = true;
-		CProfile_Colors[Color_Red] = true;
-		CProfile_Colors[Color_Blue] = true;
-		CProfile_Colors[Color_Olive] = true;
-		CProfile_TeamIndex[Color_Lightgreen] = SERVER_INDEX;
-		CProfile_TeamIndex[Color_Red] = 2;
-		CProfile_TeamIndex[Color_Blue] = 3;
-		CProfile_SayText2 = true;
-	}
-	else if (StrEqual(szGameName, "left4dead", false) || StrEqual(szGameName, "left4dead2", false))
-	{
-		CProfile_Colors[Color_Lightgreen] = true;
-		CProfile_Colors[Color_Red] = true;
-		CProfile_Colors[Color_Blue] = true;
-		CProfile_Colors[Color_Olive] = true;		
-		CProfile_TeamIndex[Color_Lightgreen] = SERVER_INDEX;
-		CProfile_TeamIndex[Color_Red] = 3;
-		CProfile_TeamIndex[Color_Blue] = 2;
-		CProfile_SayText2 = true;
-	}
-	else if (StrEqual(szGameName, "hl2mp", false))
-	{
-		/* hl2mp profile is based on mp_teamplay convar */
-		if (GetConVarBool(FindConVar("mp_teamplay")))
-		{
-			CProfile_Colors[Color_Red] = true;
-			CProfile_Colors[Color_Blue] = true;
-			CProfile_Colors[Color_Olive] = true;
-			CProfile_TeamIndex[Color_Red] = 3;
-			CProfile_TeamIndex[Color_Blue] = 2;
-			CProfile_SayText2 = true;
-		}
-		else
-		{
-			CProfile_SayText2 = false;
-			CProfile_Colors[Color_Olive] = true;
-		}
-	}
-	else if (StrEqual(szGameName, "dod", false))
-	{
-		CProfile_Colors[Color_Olive] = true;
-		CProfile_SayText2 = false;
-	}
-	/* Profile for other games */
-	else
-	{
-		if (GetUserMessageId("SayText2") == INVALID_MESSAGE_ID)
-		{
-			CProfile_SayText2 = false;
-		}
-		else
-		{
-			CProfile_Colors[Color_Red] = true;
-			CProfile_Colors[Color_Blue] = true;
-			CProfile_TeamIndex[Color_Red] = 2;
-			CProfile_TeamIndex[Color_Blue] = 3;
-			CProfile_SayText2 = true;
-		}
 	}
 }
 
