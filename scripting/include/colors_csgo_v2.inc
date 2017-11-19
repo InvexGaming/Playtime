@@ -2,15 +2,14 @@
 *                                                                        *
 *                       Colored Chat Functions                           *
 *                   Author: exvel, Editor: Popoklopsi, Powerlord, Bara   *
-*                           Version: 2.0 (Edited by Byte)	               *
+*                           Version: 2.0                                 *
 *                                                                        *
 **************************************************************************/
 
-
-#if defined _colors_included
+#if defined _colors_csgo_v2_included
 #endinput
 #endif
-#define _colors_included
+#define _colors_csgo_v2_included
 
 #define MAX_MESSAGE_LENGTH 250
 #define MAX_COLORS 16
@@ -40,17 +39,17 @@ enum Colors
 }
 
 /* Colors' properties */
-new String:CTag[][] = {"{default}", "{darkred}", "{green}", "{lightgreen}", "{olive}", "{lime}", "{lightred}", "{purple}", "{grey}", "{yellow}", "{orange}", "{bluegrey}", "{lightblue}", "{darkblue}", "{grey2}", "{orchid}"};
-new String:CTagCode[][] = {"\x01", "\x02", "\x04", "\x03", "\x05", "\x06", "\x07", "\x03", "\x08", "\x09", "\x10", "\x0A", "\x0B", "\x0C", "\x0D", "\x0E"};
+char CTag[][] = {"{default}", "{darkred}", "{green}", "{lightgreen}", "{olive}", "{lime}", "{lightred}", "{purple}", "{grey}", "{yellow}", "{orange}", "{bluegrey}", "{lightblue}", "{darkblue}", "{grey2}", "{orchid}"};
+char CTagCode[][] = {"\x01", "\x02", "\x04", "\x03", "\x05", "\x06", "\x07", "\x03", "\x08", "\x09", "\x10", "\x0A", "\x0B", "\x0C", "\x0D", "\x0E"};
 
-new bool:CTagReqSayText2[] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
-new bool:CEventIsHooked = false;
-new bool:CSkipList[MAXPLAYERS+1] = {false,...};
+bool CTagReqSayText2[] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false};
+bool CEventIsHooked = false;
+bool CSkipList[MAXPLAYERS+1] = {false,...};
 
 /* Game default profile */
-new bool:CProfile_Colors[] = {true, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false};
-new CProfile_TeamIndex[] = {NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX};
-new bool:CProfile_SayText2 = false;
+bool CProfile_Colors[] = {true, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false};
+int CProfile_TeamIndex[] = {NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX, NO_INDEX};
+bool CProfile_SayText2 = false;
 
 /**
 * Prints a message to a specific client in the chat area.
@@ -62,7 +61,7 @@ new bool:CProfile_SayText2 = false;
 * 
 * On error/Errors:   If the client is not connected an error will be thrown.
 */
-stock CPrintToChat(client, const String:szMessage[], any:...)
+stock void CPrintToChat(int client, const char[] szMessage, any ...)
 {
 	if (client <= 0 || client > MaxClients)
 		ThrowError("Invalid client index %d", client);
@@ -70,15 +69,15 @@ stock CPrintToChat(client, const String:szMessage[], any:...)
 	if (!IsClientInGame(client))
 		ThrowError("Client %d is not in game", client);
 	
-	decl String:szBuffer[MAX_MESSAGE_LENGTH];
-	decl String:szCMessage[MAX_MESSAGE_LENGTH];
+	char szBuffer[MAX_MESSAGE_LENGTH];
+	char szCMessage[MAX_MESSAGE_LENGTH];
 	
 	SetGlobalTransTarget(client);
 	
 	Format(szBuffer, sizeof(szBuffer), "\x01%s", szMessage);
 	VFormat(szCMessage, sizeof(szCMessage), szBuffer, 3);
 	
-	new index = CFormat(szCMessage, sizeof(szCMessage));
+	int index = CFormat(szCMessage, sizeof(szCMessage));
 	
 	if (index == NO_INDEX)
 		PrintToChat(client, "%s", szCMessage);
@@ -86,10 +85,9 @@ stock CPrintToChat(client, const String:szMessage[], any:...)
 		CSayText2(client, index, szCMessage);
 }
 
-stock CReplyToCommand(client, const String:szMessage[], any:...)
+stock void CReplyToCommand(int client, const char[] szMessage, any ...)
 {
-	
-	decl String:szCMessage[MAX_MESSAGE_LENGTH];
+	char szCMessage[MAX_MESSAGE_LENGTH];
 	VFormat(szCMessage, sizeof(szCMessage), szMessage, 3);
 	
 	if (client == 0)
@@ -116,11 +114,11 @@ stock CReplyToCommand(client, const String:szMessage[], any:...)
 * @param szMessage   Message (formatting rules)
 * @return			  No return
 */
-stock CPrintToChatAll(const String:szMessage[], any:...)
+stock void CPrintToChatAll(const char[] szMessage, any ...)
 {
-	decl String:szBuffer[MAX_MESSAGE_LENGTH];
+	char szBuffer[MAX_MESSAGE_LENGTH];
 	
-	for (new i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && !IsFakeClient(i) && !CSkipList[i])
 		{
@@ -145,7 +143,7 @@ stock CPrintToChatAll(const String:szMessage[], any:...)
 * 
 * On error/Errors:   If the client or author are not connected an error will be thrown.
 */
-stock CPrintToChatEx(client, author, const String:szMessage[], any:...)
+stock void CPrintToChatEx(int client, int author, const char[] szMessage, any ...)
 {
 	if (client <= 0 || client > MaxClients)
 		ThrowError("Invalid client index %d", client);
@@ -156,15 +154,15 @@ stock CPrintToChatEx(client, author, const String:szMessage[], any:...)
 	if (author < 0 || author > MaxClients)
 		ThrowError("Invalid client index %d", author);
 	
-	decl String:szBuffer[MAX_MESSAGE_LENGTH];
-	decl String:szCMessage[MAX_MESSAGE_LENGTH];
+	char szBuffer[MAX_MESSAGE_LENGTH];
+	char szCMessage[MAX_MESSAGE_LENGTH];
 	
 	SetGlobalTransTarget(client);
 	
 	Format(szBuffer, sizeof(szBuffer), "\x01%s", szMessage);
 	VFormat(szCMessage, sizeof(szCMessage), szBuffer, 4);
 	
-	new index = CFormat(szCMessage, sizeof(szCMessage), author);
+	int index = CFormat(szCMessage, sizeof(szCMessage), author);
 	
 	if (index == NO_INDEX)
 		PrintToChat(client, "%s", szCMessage);
@@ -182,7 +180,7 @@ stock CPrintToChatEx(client, author, const String:szMessage[], any:...)
 * 
 * On error/Errors:   If the author is not connected an error will be thrown.
 */
-stock CPrintToChatAllEx(author, const String:szMessage[], any:...)
+stock void CPrintToChatAllEx(int author, const char[] szMessage, any ...)
 {
 	if (author < 0 || author > MaxClients)
 		ThrowError("Invalid client index %d", author);
@@ -190,9 +188,9 @@ stock CPrintToChatAllEx(author, const String:szMessage[], any:...)
 	if (!IsClientInGame(author))
 		ThrowError("Client %d is not in game", author);
 	
-	decl String:szBuffer[MAX_MESSAGE_LENGTH];
+	char szBuffer[MAX_MESSAGE_LENGTH];
 	
-	for (new i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && !IsFakeClient(i) && !CSkipList[i])
 		{
@@ -212,9 +210,9 @@ stock CPrintToChatAllEx(author, const String:szMessage[], any:...)
 * @param szMessage   String.
 * @return			  No return
 */
-stock CRemoveTags(String:szMessage[], maxlength)
+stock void CRemoveTags(char[] szMessage, int maxlength)
 {
-	for (new i = 0; i < MAX_COLORS; i++)
+	for (int i = 0; i < MAX_COLORS; i++)
 		ReplaceString(szMessage, maxlength, CTag[i], "", false);
 	
 	ReplaceString(szMessage, maxlength, "{teamcolor}", "", false);
@@ -226,7 +224,7 @@ stock CRemoveTags(String:szMessage[], maxlength)
 * @param tag   		Color Tag.
 * @return			 	True when color is supported, otherwise false
 */
-stock CColorAllowed(Colors:color)
+stock bool CColorAllowed(Colors color)
 {
 	if (!CEventIsHooked)
 	{
@@ -246,7 +244,7 @@ stock CColorAllowed(Colors:color)
 * @param newColor   		color to replace with.
 * @noreturn
 */
-stock CReplaceColor(Colors:color, Colors:newColor)
+stock void CReplaceColor(Colors color, Colors newColor)
 {
 	if (!CEventIsHooked)
 	{
@@ -272,7 +270,7 @@ stock CReplaceColor(Colors:color, Colors:newColor)
 * @param client   Client index
 * @return		   No return
 */
-stock CSkipNextClient(client)
+stock void CSkipNextClient(int client)
 {
 	if (client <= 0 || client > MaxClients)
 		ThrowError("Invalid client index %d", client);
@@ -289,9 +287,9 @@ stock CSkipNextClient(client)
 * 
 * On error/Errors:   If there is more then one team color is used an error will be thrown.
 */
-stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
+stock int CFormat(char[] szMessage, int maxlength, int author=NO_INDEX)
 {
-	decl String:szGameName[30];
+	char szGameName[30];
 	
 	GetGameFolderName(szGameName, sizeof(szGameName));
 	
@@ -304,7 +302,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 		CEventIsHooked = true;
 	}
 	
-	new iRandomPlayer = NO_INDEX;
+	int iRandomPlayer = NO_INDEX;
 	
 	// On CS:GO set invisible precolor
 	if (StrEqual(szGameName, "csgo", false)) 
@@ -327,7 +325,7 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 	ReplaceString(szMessage, maxlength, "{teamcolor}", "", false);
 	
 	/* For other color tags we need a loop */
-	for (new i = 0; i < MAX_COLORS; i++)
+	for (int i = 0; i < MAX_COLORS; i++)
 	{
 		/* If tag not found - skip */
 		if (StrContains(szMessage, CTag[i], false) == -1)
@@ -386,13 +384,13 @@ stock CFormat(String:szMessage[], maxlength, author=NO_INDEX)
 * @param color_team  Client team.
 * @return			  Client index or NO_PLAYER if no player found
 */
-stock CFindRandomPlayerByTeam(color_team)
+stock int CFindRandomPlayerByTeam(int color_team)
 {
 	if (color_team == SERVER_INDEX)
 		return 0;
 	else
 	{
-		for (new i = 1; i <= MaxClients; i++)
+		for (int i = 1; i <= MaxClients; i++)
 		{
 			if (IsClientInGame(i) && GetClientTeam(i) == color_team)
 				return i;
@@ -410,9 +408,9 @@ stock CFindRandomPlayerByTeam(color_team)
 * @param szMessage   Message
 * @return			  No return.
 */
-stock CSayText2(client, author, const String:szMessage[])
+stock void CSayText2(int client, int author, const char[] szMessage)
 {
-	new Handle:hBuffer = StartMessageOne("SayText2", client, USERMSG_RELIABLE|USERMSG_BLOCKHOOKS);
+	Handle hBuffer = StartMessageOne("SayText2", client, USERMSG_RELIABLE|USERMSG_BLOCKHOOKS);
 	
 	if(GetFeatureStatus(FeatureType_Native, "GetUserMessageType") == FeatureStatus_Available && GetUserMessageType() == UM_Protobuf) 
 	{
@@ -440,9 +438,9 @@ stock CSayText2(client, author, const String:szMessage[])
 *
 * @return			  No return.
 */
-stock CSetupProfile()
+stock void CSetupProfile()
 {
-	decl String:szGameName[30];
+	char szGameName[30];
 	GetGameFolderName(szGameName, sizeof(szGameName));
 	
 	if (StrEqual(szGameName, "csgo", false))
@@ -469,11 +467,11 @@ stock CSetupProfile()
 	}
 }
 
-public Action:CEvent_MapStart(Handle:event, const String:name[], bool:dontBroadcast)
+public Action CEvent_MapStart(Event event, const char[] name, bool dontBroadcast)
 {
 	CSetupProfile();
 	
-	for (new i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 		CSkipList[i] = false;
 }
 
